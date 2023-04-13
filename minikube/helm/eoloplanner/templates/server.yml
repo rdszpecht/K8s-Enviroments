@@ -1,0 +1,137 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-server-deploy
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-server
+        dns-policy: enabled
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: {{ .Release.Name }}-server
+        image: {{ .Values.images.server.image }}:{{ .Values.images.server.tag }}
+        command: ["bash"]
+        args:
+        - "-c"
+        - "./wait-for-it.sh {{ .Release.Name }}-mysql-service:3306 -t 120 -- ./wait-for-it.sh {{ .Release.Name }}-rabbitmq-service:5672 -t 120 -- node src/server.js"
+        env:
+        - name: MYSQL_HOST
+          value: {{ .Release.Name }}-mysql-service
+        - name: MYSQL_DB
+          value: eoloplantsDB
+        - name: MYSQL_USER
+          value: root
+        - name: MYSQL_PASS
+          value: password
+        - name: RABBITMQ_URL
+          value: amqp://root:password@{{ .Release.Name }}-rabbitmq-service
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-server-service
+  labels:
+    app: {{ .Release.Name }}-server
+spec:
+  selector:
+    app: {{ .Release.Name }}-server
+{{- if .Values.ingress.enabled}}
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: server-port
+  type: ClusterIP
+  {{- else}}
+  {{- if eq .Values.ingress.alternativeService "NodePort"}}
+  ports:
+  - port: 3000
+    targetPort: 3000
+    nodePort: 30000
+    name: server-port
+  type: NodePort
+  {{- else if eq .Values.ingress.alternativeService "LoadBalancer"}}
+    ports:
+  - port: 3030
+    targetPort: 3030
+    protocol: TCP
+    name: server-port
+  type: LoadBalancer
+  {{- end}}
+{{- end}}
+---
+{{- if .Values.policies.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-server-to-mysql-rabbit
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-server
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: {{ .Release.Name }}-mysql
+    ports:
+    - port: 3306
+      protocol: TCP
+  - to:
+    - podSelector:
+        matchLabels:
+          app: {{ .Release.Name }}-rabbitmq
+    ports:
+    - port: 5672
+      protocol: TCP
+{{- end}}
+---
+{{- if .Values.policies.enabled -}}
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-server-from-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-server
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ingress-nginx
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 3000
+{{- else}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-server-external-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-server
+  ingress:
+    - from: []
+      ports:
+      - port: 3000
+{{- end}}
+
+{{- end}}

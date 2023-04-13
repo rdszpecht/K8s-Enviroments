@@ -1,0 +1,133 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-toposervice-deploy
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-toposervice
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-toposervice
+        dns-policy: enabled
+    spec:
+      securityContext:
+        runAsUser: 1001
+      restartPolicy: Always
+      containers:
+      - name: {{ .Release.Name }}-toposervice
+        image: {{ .Values.images.toposervice.image }}:{{ .Values.images.toposervice.tag }}
+        env:
+        - name: SPRING_DATA_MONGODB_HOST
+          value: {{ .Release.Name }}-mongodb-service
+        - name: SPRING_DATA_MONGODB_PORT
+          value: "27017"
+        - name: SPRING_DATA_MONGODB_DATABASE
+          value: topoDB
+        - name: SPRING_DATA_MONGODB_AUTHENTICATION-DATABASE
+          value: admin
+        - name: SPRING_DATA_MONGODB_USERNAME
+          value: root
+        - name: SPRING_DATA_MONGODB_PASSWORD
+          value: password
+        ports:
+        - containerPort: 8181
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-toposervice-service
+  labels:
+    app: {{ .Release.Name }}-toposervice
+spec:
+  selector:
+    app: {{ .Release.Name }}-toposervice
+{{- if .Values.ingress.enabled}}
+  ports:
+  - port: 8181
+    targetPort: 8181
+    protocol: TCP
+    name: topo-port
+  
+  type: ClusterIP
+  {{- else}}
+  {{- if eq .Values.ingress.alternativeService "NodePort"}}
+  ports:
+  - port: 8181
+    targetPort: 8181
+    nodePort: 30001
+    name: topo-port
+  type: NodePort
+  {{- else if eq .Values.ingress.alternativeService "LoadBalancer"}}
+    ports:
+  - port: 8181
+    targetPort: 8181
+    protocol: TCP
+    name: topo-port
+  type: LoadBalancer
+  {{- end}}
+{{- end}}
+---
+{{- if .Values.policies.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-topo-to-mongodb
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-toposervice
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: {{ .Release.Name }}-mongodb
+    ports:
+    - port: 27017
+      protocol: TCP
+{{- end}}
+---
+{{- if .Values.policies.enabled -}}
+{{- if .Values.ingress.enabled}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-topo-from-planner-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-toposervice
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: {{ .Release.Name }}-planner
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8181
+{{- else}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-topo-external-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-toposervice
+  ingress:
+    - from: []
+      ports:
+      - port: 8181
+{{- end}}
+{{- end}}

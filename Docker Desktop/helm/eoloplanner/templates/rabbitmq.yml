@@ -1,0 +1,99 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-rabbitmq-deploy
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-rabbitmq
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-rabbitmq
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-rabbitmq
+        image: {{ .Values.images.rabbitmq.image }}:{{ .Values.images.rabbitmq.tag }}
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: root
+        - name: RABBITMQ_DEFAULT_PASS
+          value: password
+        ports:
+        - containerPort: 5672
+        - containerPort: 15672
+        volumeMounts:
+        - mountPath: /var/lib/rabbitmq/mnesia
+          name: {{ .Release.Name }}-datarabbit
+      volumes:
+      - name: {{ .Release.Name }}-datarabbit
+        persistentVolumeClaim:
+          # No se crean porque se asume que ya están creados. En este caso, 
+          # se debera poder especificar la storageclass de cada servicio que lo necesita
+{{- if .Values.persistance.enabled -}}      
+          claimName: {{ .Release.Name }}-rabbit-pvc
+{{- else }}
+          claimName: {{ .Values.persistance.rabbitmq | quote }}
+{{- end }}
+---
+# Se crean los PersistenceVolumes (opcion por defecto)
+# Se crean de forma dinámica usando el StorageClass por defecto de la plataforma
+{{- if .Values.persistance.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-rabbit-pvc
+spec:
+  storageClassName: {{ .Release.Name }}-rabbit
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+{{- end}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-rabbitmq-service
+  labels:
+    app: {{ .Release.Name }}-rabbitmq
+spec:
+  ports:
+  - port: 5672
+    targetPort: 5672
+    protocol: TCP
+    name: rabbitmq-port-5672
+  - port: 15672
+    targetPort: 15672
+    protocol: TCP
+    name: rabbitmq-port-15672
+  selector:
+    app: {{ .Release.Name }}-rabbitmq
+  type: ClusterIP
+---
+{{- if .Values.policies.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-rabbitmq-from-planner-server
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Release.Name }}-rabbitmq
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: {{ .Release.Name }}-planner
+    - podSelector:
+        matchLabels:
+          app: {{ .Release.Name }}-server
+    ports:
+    - port: 5672
+      protocol: TCP
+{{- end}}

@@ -1,0 +1,18 @@
+---
+{{- if .Values.persistance.enabled }}
+# Se crean los PersistenceVolumes (opcion por defecto)
+# Se crean de forma dinámica usando el StorageClass por defecto de la plataforma
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Name }}-mysql-pv
+spec:
+  storageClassName: {{ .Release.Name }}-mysql
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /db/mysql/{{ .Release.Name }}
+{{- end }}
+---

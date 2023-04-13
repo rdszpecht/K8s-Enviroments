@@ -1,0 +1,38 @@
+policies:
+  enabled: true
+
+persistance:
+  enabled: true
+  storageclasses:
+    mysql: "mysql"
+    mongodb: "mongodb"
+    rabbitmq: "rabbit"
+
+images:
+  server:
+    image: "rdszpecht/server"
+    tag: "v1.0"
+  planner:
+    image: "rdszpecht/planner"
+    tag: "v2"
+  toposervice:
+    image: "rdszpecht/toposervice"
+    tag: "v1.0"
+  weatherservice:
+    image: "rdszpecht/weatherservice"
+    tag: "v1.0"
+  mysql:
+    image: "mysql"
+    tag: "8.0.28"
+  mongodb:
+    image: "mongo"
+    tag: "5.0.6-focal"
+  rabbitmq:
+    image: "rabbitmq"
+    tag: "3.9-management"
+
+ingress:
+  enabled: false
+  hosts:
+    host: cluster-ip
+  alternativeService: NodePort

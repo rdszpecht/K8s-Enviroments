@@ -1,0 +1,11 @@
+Instalado correctamente: {{ .Release.Name }}
+
+{{- if .Values.ingress.enabled}}
+Aplicación desplegada con Ingress.
+Para acceder a la aplicación entrar en: 
+http://{{ .Values.ingress.hosts.host}}
+{{- else}}
+Aplicación desplegada sin Ingress.
+Para acceder a la aplicación entrar en:
+{ip-del-cluster}:30000
+{{- end}}
