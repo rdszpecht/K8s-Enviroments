@@ -11,6 +11,16 @@ For each enviroment, you are going to find a folder, with the steps you want to 
 * [**Microk8s (Linux)**](./microk8s/)
 * [**K3s (Linux)**](./k3s/)
 
+## Comparison table:
+
+|                | Instalation dificulty | Usage dificulty          | For learning purposes | Production capacity | Addons and Plugins | Default LoadBalancer | PVCs       | Default CNI                   | Network Policies                                   | Helm | Multinode                     | Native or Docker | Deployment Speed |
+| -------------- | --------------------- | ------------------------ | --------------------- | ------------------- | ------------------ | -------------------- | ---------- | ----------------------------- | -------------------------------------------------- | ---- | ----------------------------- | ---------------- | ---------------- |
+| Minikube       | Easy                  | Very Easy                | Best                  | No                  | Good               | MetalLB - Addon      | By default | Docker default bridge-network | No by default, you can install other cni providers | Yes  | YES minikube 1.10.1 or higher | Docker           | Moderate         |
+| Microk8s       | Easy (snap required)  | Very Easy                | Good                  | Yes                 | Great              | MetalLB - Addon      | By plugins | Calico                        | Yes                                                | Yes  | YES                           | Native           | High             |
+| K3s            | Easy                  | Easy, CLI + Scripts      | Moderate              | Yes                 | No                 | ServiceLB            | By default | Flannel                       | Yes                                                | Yes  | YES                           | Native           | High             |
+| Kind           | Easy                  | Easy                     | Good                  | No                  | No                 | No default LB        | By default | kindnetd                      | No                                                 | Yes  | YES                           | Docker           | Moderate         |
+| Docker Desktop | Moderate              | Graphical User Interface | Bad                   | No                  | No                 | No                   | Yes        | Any                           | No                                                 | Yes  | NO                            | Docker           | Slow             |
+
 ## Conclusions
 
 After doing some tests, research, and working a little bit with each distribution, these are our thougts:
